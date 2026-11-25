@@ -1,0 +1,57 @@
+
+name: Build Sorbon AI APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get source code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract Android project
+        run: |
+          ZIP=$(find . -maxdepth 1 -name '*.zip' -print -quit)
+          if [ -z "$ZIP" ]; then
+            echo "ZIP file not found"
+            exit 1
+          fi
+          mkdir android-project
+          unzip -q "$ZIP" -d android-project
+
+      - name: Build APK
+        run: |
+          WRAPPER=$(find android-project -name gradlew -type f | head -n 1)
+          if [ -z "$WRAPPER" ]; then
+            echo "gradlew file not found in ZIP"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$WRAPPER")
+          chmod +x "$WRAPPER"
+          cd "$PROJECT_DIR"
+          ./gradlew assembleDebug
+          APK=$(find . -path '*/build/outputs/apk/debug/*.apk' -type f | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "APK not found"
+            exit 1
+          fi
+          echo "APK_PATH=$PROJECT_DIR/$APK" >> "$GITHUB_ENV"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sorbon-AI-APK
+          path: ${{ env.APK_PATH }}
+concurrency: 
